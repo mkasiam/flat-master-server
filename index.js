@@ -23,7 +23,8 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const userCollection = client.db("FlatDB").collection("users");
-    const flatCollection = client.db("FlatDB").collection("flats");
+    const apartmentCollection = client.db("FlatDB").collection("flats");
+    const agreementCollection = client.db("FlatDB").collection("agreements");
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
     // Send a ping to confirm a successful connection
@@ -53,12 +54,6 @@ async function run() {
       });
     };
 
-    // flat related api
-    app.get("/flats", async (req, res) => {
-      const result = await flatCollection.find().toArray();
-      res.send(result);
-    });
-
     // use verify admin after verifyToken
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
@@ -71,12 +66,37 @@ async function run() {
       next();
     };
 
+    // flat related api
+    app.get("/apartments", async (req, res) => {
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
+      const result = await apartmentCollection
+        .find()
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+      res.send(result);
+    });
+    app.get("/apartmentCount", async (req, res) => {
+      const count = await apartmentCollection.estimatedDocumentCount();
+      res.send({ count });
+    });
+    // Agreement request related api
+    app.post("/agreements", async (req, res) => {
+      const agreement = req.body;
+      const result = await agreementCollection.insertOne(agreement);
+      res.send(result);
+    });
+    app.get("/agreements", async (req, res) => {
+      const result = await agreementCollection.find().toArray();
+      res.send(result);
+    });
     // User related api
-    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
-    
+
     app.get("/users/admin/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
 
@@ -93,7 +113,7 @@ async function run() {
       res.send({ admin });
     });
 
-    app.post("/users", verifyToken, async (req, res) => {
+    app.post("/users", async (req, res) => {
       const user = req.body;
       // insert email if user doesn't exists:
       // you can do this many ways (1. email unique, 2. upsert 3. simple checking)
