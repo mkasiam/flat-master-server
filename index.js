@@ -40,9 +40,10 @@ async function run() {
 
     // middlewares
     const verifyToken = (req, res, next) => {
-      // console.log('inside verify token', req.headers.authorization);
       if (!req.headers.authorization) {
-        return res.status(401).send({ message: "unauthorized access" });
+        return res
+          .status(401)
+          .send({ message: "ami bhai prothomei unauthorized access" });
       }
       const token = req.headers.authorization.split(" ")[1];
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
@@ -67,7 +68,7 @@ async function run() {
     };
 
     // flat related api
-    app.get("/apartments", async (req, res) => {
+    app.get("/apartments", verifyToken, async (req, res) => {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size);
       const result = await apartmentCollection
@@ -82,12 +83,12 @@ async function run() {
       res.send({ count });
     });
     // Agreement request related api
-    app.post("/agreements", async (req, res) => {
+    app.post("/agreements", verifyToken, verifyAdmin, async (req, res) => {
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
       res.send(result);
     });
-    app.get("/agreements", async (req, res) => {
+    app.get("/agreements", verifyToken, verifyAdmin, async (req, res) => {
       const result = await agreementCollection.find().toArray();
       res.send(result);
     });
@@ -96,27 +97,36 @@ async function run() {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
-
-    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+    app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
-
-      if (email !== req.decoded.email) {
-        return res.status(403).send({ message: "forbidden access" });
-      }
-
       const query = { email: email };
-      const user = await userCollection.findOne(query);
-      let admin = false;
-      if (user) {
-        admin = user?.role === "admin";
-      }
-      res.send({ admin });
+      const result = await userCollection.findOne(query);
+      res.send(result);
     });
+
+    app.get(
+      "/users/admin/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+
+        if (email !== req.decoded.email) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
+
+        const query = { email: email };
+        const user = await userCollection.findOne(query);
+        let admin = false;
+        if (user) {
+          admin = user?.role === "admin";
+        }
+        res.send({ admin });
+      }
+    );
 
     app.post("/users", async (req, res) => {
       const user = req.body;
-      // insert email if user doesn't exists:
-      // you can do this many ways (1. email unique, 2. upsert 3. simple checking)
       const query = { email: user.email };
       const existingUser = await userCollection.findOne(query);
       if (existingUser) {
@@ -126,6 +136,17 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
     app.delete("/users/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
