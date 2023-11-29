@@ -8,7 +8,9 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // using middlewares
-app.use(cors({ origin: ["http://localhost:5173"] }));
+app.use(
+  cors({ origin: ["http://localhost:5173", "https://flat-master.web.app/"] })
+);
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.txr9c3h.mongodb.net/?retryWrites=true&w=majority`;
@@ -25,9 +27,12 @@ async function run() {
     const userCollection = client.db("FlatDB").collection("users");
     const apartmentCollection = client.db("FlatDB").collection("flats");
     const agreementCollection = client.db("FlatDB").collection("agreements");
-    // Connect the client to the server	(optional starting in v4.7)
+    const announcementCollection = client
+      .db("FlatDB")
+      .collection("announcements");
+    const couponCollection = client.db("FlatDB").collection("coupons");
+
     // await client.connect();
-    // Send a ping to confirm a successful connection
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -198,7 +203,26 @@ async function run() {
       const result = await userCollection.deleteOne(query);
       res.send(result);
     });
-
+    // Announcement related api
+    app.post("/announcements", async (req, res) => {
+      const announcement = req.body;
+      const result = await announcementCollection.insertOne(announcement);
+      res.send(result);
+    });
+    app.get("/announcements", async (req, res) => {
+      const result = await announcementCollection.find().toArray();
+      res.send(result);
+    });
+    // Coupons related api
+    app.post("/coupons", async (req, res) => {
+      const coupon = req.body;
+      const result = await couponCollection.insertOne(coupon);
+      res.send(result);
+    });
+    app.get("/coupons", async (req, res) => {
+      const result = await couponCollection.find().toArray();
+      res.send(result);
+    });
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
