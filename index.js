@@ -8,7 +8,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // using middlewares
-app.use(cors());
+app.use(cors({ origin: ["http://localhost:5173"] }));
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.txr9c3h.mongodb.net/?retryWrites=true&w=majority`;
@@ -68,7 +68,7 @@ async function run() {
     };
 
     // flat related api
-    app.get("/apartments", verifyToken, async (req, res) => {
+    app.get("/apartments", async (req, res) => {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size);
       const result = await apartmentCollection
@@ -83,18 +83,52 @@ async function run() {
       res.send({ count });
     });
     // Agreement request related api
-    app.post("/agreements", verifyToken, verifyAdmin, async (req, res) => {
+    app.post("/agreements", verifyToken, async (req, res) => {
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
       res.send(result);
     });
-    app.get("/agreements", verifyToken, verifyAdmin, async (req, res) => {
-      const result = await agreementCollection.find().toArray();
+    app.get("/agreements", async (req, res) => {
+      const status = req.query.status;
+      const filter = {};
+      if (status === "pending") {
+        filter.status = "pending";
+      }
+      const result = await agreementCollection.find(filter).toArray();
+      res.send(result);
+    });
+    app.put("/agreements/:id", async (req, res) => {
+      const agreement = req.body;
+      console.log(agreement);
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          accept_date: agreement.accept_date,
+          status: agreement.status,
+          role: agreement.role,
+        },
+      };
+      const result = await agreementCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
       res.send(result);
     });
     // User related api
     app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/users", async (req, res) => {
+      const role = req.query.role;
+      const filter = {};
+      if (role === "member") {
+        filter.role = "member";
+      }
+      const result = await userCollection.find(filter).toArray();
       res.send(result);
     });
     app.get("/users/:email", async (req, res) => {
@@ -142,6 +176,17 @@ async function run() {
       const updatedDoc = {
         $set: {
           role: "admin",
+        },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+    app.patch("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const updatedDoc = {
+        $set: {
+          role: "member",
         },
       };
       const result = await userCollection.updateOne(filter, updatedDoc);
