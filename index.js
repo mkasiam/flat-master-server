@@ -47,9 +47,7 @@ async function run() {
     // middlewares
     const verifyToken = (req, res, next) => {
       if (!req.headers.authorization) {
-        return res
-          .status(401)
-          .send({ message: "ami bhai prothomei unauthorized access" });
+        return res.status(401).send({ message: "unauthorized access" });
       }
       const token = req.headers.authorization.split(" ")[1];
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
@@ -94,7 +92,7 @@ async function run() {
       const result = await agreementCollection.insertOne(agreement);
       res.send(result);
     });
-    app.get("/agreements", async (req, res) => {
+    app.get("/agreements", verifyToken, verifyAdmin, async (req, res) => {
       const status = req.query.status;
       const filter = {};
       if (status === "pending") {
@@ -103,7 +101,7 @@ async function run() {
       const result = await agreementCollection.find(filter).toArray();
       res.send(result);
     });
-    app.put("/agreements/:id", async (req, res) => {
+    app.put("/agreements/:id", verifyToken, verifyAdmin, async (req, res) => {
       const agreement = req.body;
       console.log(agreement);
       const id = req.params.id;
@@ -124,11 +122,11 @@ async function run() {
       res.send(result);
     });
     // User related api
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const role = req.query.role;
       const filter = {};
       if (role === "member") {
@@ -176,18 +174,23 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/admin/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: "admin",
-        },
-      };
-      const result = await userCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
-    app.patch("/users/:email", async (req, res) => {
+    app.patch(
+      "/users/admin/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "admin",
+          },
+        };
+        const result = await userCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
+    app.patch("/users/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const filter = { email: email };
       const updatedDoc = {
@@ -198,14 +201,14 @@ async function run() {
       const result = await userCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await userCollection.deleteOne(query);
       res.send(result);
     });
     // Announcement related api
-    app.post("/announcements", async (req, res) => {
+    app.post("/announcements", verifyToken, verifyAdmin, async (req, res) => {
       const announcement = req.body;
       const result = await announcementCollection.insertOne(announcement);
       res.send(result);
@@ -215,7 +218,7 @@ async function run() {
       res.send(result);
     });
     // Coupons related api
-    app.post("/coupons", async (req, res) => {
+    app.post("/coupons", verifyToken, verifyAdmin, async (req, res) => {
       const coupon = req.body;
       const result = await couponCollection.insertOne(coupon);
       res.send(result);
@@ -225,10 +228,9 @@ async function run() {
       res.send(result);
     });
     // Payment related api
-    app.post("/create-payment-intent", async (req, res) => {
+    app.post("/create-payment-intent", verifyToken, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
-      console.log(amount, "amount inside the intent");
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
@@ -241,11 +243,10 @@ async function run() {
       });
     });
 
-    app.post("/payments", async (req, res) => {
+    app.post("/payments", verifyToken, async (req, res) => {
       const payment = req.body;
       const paymentResult = await paymentCollection.insertOne(payment);
 
-      
       const query = {
         _id: {
           $in: payment.cartIds.map((id) => new ObjectId(id)),
