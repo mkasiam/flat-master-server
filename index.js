@@ -9,7 +9,7 @@ const port = process.env.PORT || 5000;
 
 // using middlewares
 app.use(
-  cors({ origin: ["http://localhost:5173", "https://flat-master.web.app/"] })
+  cors({ origin: ["http://localhost:5173", "https://flat-master.web.app"] })
 );
 app.use(express.json());
 
