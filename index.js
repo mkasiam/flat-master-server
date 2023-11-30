@@ -31,6 +31,7 @@ async function run() {
       .db("FlatDB")
       .collection("announcements");
     const couponCollection = client.db("FlatDB").collection("coupons");
+    const paymentCollection = client.db("FlatDB").collection("payments");
 
     // await client.connect();
 
@@ -88,7 +89,7 @@ async function run() {
       res.send({ count });
     });
     // Agreement request related api
-    app.post("/agreements", verifyToken, async (req, res) => {
+    app.post("/agreements", async (req, res) => {
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
       res.send(result);
@@ -223,6 +224,76 @@ async function run() {
       const result = await couponCollection.find().toArray();
       res.send(result);
     });
+    // Payment related api
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount, "amount inside the intent");
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+
+      
+      const query = {
+        _id: {
+          $in: payment.cartIds.map((id) => new ObjectId(id)),
+        },
+      };
+
+      const deleteResult = await agreementCollection.deleteMany(query);
+
+      res.send({ paymentResult, deleteResult });
+    });
+    app.get("/payments/:email", verifyToken, async (req, res) => {
+      const query = { email: req.params.email };
+      if (req.params.email !== req.decoded.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // stats or analytics
+    app.get("/admin-stats", verifyToken, async (req, res) => {
+      const users = await userCollection.estimatedDocumentCount();
+      const apartments = await apartmentCollection.estimatedDocumentCount();
+      const orders = await paymentCollection.estimatedDocumentCount();
+
+      const result = await paymentCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalRevenue: {
+                $sum: "$price",
+              },
+            },
+          },
+        ])
+        .toArray();
+
+      const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+
+      res.send({
+        users,
+        apartments,
+        orders,
+        revenue,
+      });
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
