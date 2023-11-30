@@ -92,7 +92,7 @@ async function run() {
       const result = await agreementCollection.insertOne(agreement);
       res.send(result);
     });
-    app.get("/agreements", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/agreements", verifyToken,async (req, res) => {
       const status = req.query.status;
       const filter = {};
       if (status === "pending") {
@@ -101,7 +101,7 @@ async function run() {
       const result = await agreementCollection.find(filter).toArray();
       res.send(result);
     });
-    app.put("/agreements/:id", verifyToken, verifyAdmin, async (req, res) => {
+    app.put("/agreements/:id", verifyToken,  async (req, res) => {
       const agreement = req.body;
       console.log(agreement);
       const id = req.params.id;
@@ -257,7 +257,7 @@ async function run() {
 
       res.send({ paymentResult, deleteResult });
     });
-    app.get("/payments/:email", verifyToken, async (req, res) => {
+    app.get("/payments/:email", async (req, res) => {
       const query = { email: req.params.email };
       if (req.params.email !== req.decoded.email) {
         return res.status(403).send({ message: "forbidden access" });
